@@ -17,25 +17,27 @@
 
     <main>
         <h2>Practice</h2>
+        <!-- <pre>はここではいらない -->
         <?php
         try {
             $db = new PDO('mysql:dbname=mydb;host=mysql;charset=utf8', 'root', 'root');
         } catch (PDOException $e) {
             echo 'DB接続エラー: ' . $e->getMessage();
         }
-        $id = $_REQUEST['id'];
-        if (!is_numeric($id) || $id <= 0) {
-            print('1以上の数字で指定してください');
-            exit();
-        }
-        $memos = $db->prepare('SELECT * FROM memos WHERE id=?');
-        $memos->execute(array($_REQUEST['id']));
-        $memo = $memos->fetch();
+        $memos = $db->query('SELECT * FROM memos ORDER BY id DESC');
         ?>
+        <!-- </pre> -->
         <article>
-            <pre><?php print($memo['memo']); ?></pre>
-
-            <a href="index.php">戻る</a>
+            <?php while ($memo = $memos->fetch()) : ?>
+                <p>
+                    <a href="memo.php?id=<?php print($memo['id']); ?>">
+                        <?php print(mb_substr($memo['memo'], 0, 50)); ?>
+                        <?php print((mb_strlen($memo['memo']) > 50 ? '...' : '')); ?>
+                    </a>
+                </p>
+                <time><?php print($memo['created_at']); ?></time>
+                <hr>
+            <?php endwhile; ?>
         </article>
     </main>
 </body>
