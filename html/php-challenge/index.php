@@ -70,6 +70,51 @@ function makeLink($value)
 {
     return mb_ereg_replace("(https?)(://[[:alnum:]\+\$\;\?\.%,!#~*/:@&=_-]+)", '<a href="\1\2">\1\2</a>', $value);
 }
+// いいね課題
+$posts = $db->prepare('SELECT m.name, m.picture, p.*, COUNT(l.post_id) AS heart_cnt FROM members m, posts p LEFT JOIN favorites l ON p.id=l.post_id WHERE m.id=p.member_id GROUP BY l.post_id ORDER BY p.created DESC LIMIT ?, 5');
+$posts->bindParam(1, $start, PDO::PARAM_INT);
+$posts->execute();
+
+if (isset($_REQUEST['favorite'])) {
+
+    $contributor = $db->prepare('SELECT member_id FROM posts WHERE id=?');
+    $contributor->execute(array($_REQUEST['favorite']));
+    $pressed_message = $contributor->fetch();
+
+    if ($_SESSION['id'] != $pressed_message['member_id']) {
+
+        $pressed = $db->prepare('SELECT COUNT(*) AS cnt FROM favorites WHERE post_id=? AND member_id=?');
+        $pressed->execute(array(
+            $_REQUEST['favorite'],
+            $_SESSION['id']
+        ));
+        $my_heart_cnt = $pressed->fetch();
+
+        if ($my_heart_cnt['cnt'] < 1) {
+            $press = $db->prepare('INSERT INTO favorites SET post_id=?, member_id=?, created=NOW()');
+            $press->execute(array(
+                $_REQUEST['favorite'],
+                $_SESSION['id']
+            ));
+            header("Location: index.php?page={$page}");
+            exit();
+        } else {
+            $cancel = $db->prepare('DELETE FROM favorites WHERE post_id=? AND member_id=?');
+            $cancel->execute(array(
+                $_REQUEST['favorite'],
+                $login_user
+            ));
+            header("Location: index.php?page={$page}");
+            exit();
+        }
+    }
+}
+
+$heart = $db->prepare('SELECT post_id FROM favorites WHERE member_id=?');
+$heart->execute(array($_SESSION['id']));
+while ($heart_record = $heart->fetch()) {
+    $my_heart[] = $heart_record;
+}
 ?>
 <!DOCTYPE html>
 <html lang="ja">
@@ -117,9 +162,20 @@ function makeLink($value)
                         <span class="retweet">
                             <img class="retweet-image" src="images/retweet-solid-gray.svg"><span style="color:gray;">12</span>
                         </span>
-                        <span class="favorite">
-                            <img class="favorite-image" src="images/heart-solid-gray.svg"><span style="color:gray;">34</span>
-                        </span>
+                        <?php if ($my_heart_cnt < 1) : ?>
+                            <span class="favorite">
+                                <a href="index.php?favorite=<?php echo h($post['id']); ?>">
+                                    <img class="favorite-image" src="images/heart-solid-gray.svg"><span style="color:gray;"><?php echo h($post['heart_cnt']); ?></span>
+                                </a>
+                            </span>
+                        <?php else : ?>
+                            <span class="favorite">
+                                <a href="index.php?favorite=<?php echo h($post['id']); ?>">
+                                    <img class="favorite-image" src="images/heart-solid-red.svg"><span style="color:red;"><?php echo h($post['heart_cnt']); ?></span>
+                                </a>
+                            </span>
+                        <?php endif; ?>
+                        <span><?php echo h($post['heart_cnt']); ?></span>
 
                         <a href="view.php?id=<?php echo h($post['id']); ?>"><?php echo h($post['created']); ?></a>
                         <?php
